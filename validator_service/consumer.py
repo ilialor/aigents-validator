@@ -72,11 +72,21 @@ class ValidatorConsumer:
             logger.error(f"Ошибка при подключении к RabbitMQ: {e}", exc_info=True)
             raise
 
-    def get_practice_details(self, practice_id: int) -> Dict:
+    def get_practice_details(self, practice_id: str) -> Dict:
         """Получение деталей практики через FastAPI"""
-        response = requests.get(f"{settings.FASTAPI_URL}/practices/{practice_id}")
-        response.raise_for_status()
-        return response.json()
+        try:
+            url = f"{settings.FASTAPI_URL}/api/v1/practices/{practice_id}"
+            logger.info(f"Fetching practice details from: {url}")
+            
+            response = requests.get(url)
+            response.raise_for_status()
+            
+            logger.info(f"Successfully retrieved practice details for ID: {practice_id}")
+            return response.json()
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching practice details: {e}")
+            raise
 
     def process_message(self, ch, method, properties, body):
         """Обработка сообщения из очереди"""

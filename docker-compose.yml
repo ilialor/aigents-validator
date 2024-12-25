@@ -1,9 +1,8 @@
 version: '3.8'
 
 networks:
-  events-network:
+  aigents-network:
     external: true
-    name: events_aigents-events-network
 
 services:
   validator:
@@ -11,7 +10,7 @@ services:
       context: .
       dockerfile: Dockerfile
     networks:
-      - events-network
+      - aigents-network
     environment:
       - RABBITMQ_HOST=events-rabbitmq-1
       - RABBITMQ_PORT=5672

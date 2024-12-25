@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     RABBITMQ_USER: str = "aigents" 
     RABBITMQ_PASS: str = "aigents_secret"  
     
-    FASTAPI_URL: str = "http://fastapi:8000"
+    FASTAPI_URL: str = "http://aigents-storage-api-1:8000"
     
     # Настройки Web3
     WEB3_PROVIDER_URI: str = "http://localhost:8545"
