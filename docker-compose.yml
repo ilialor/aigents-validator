@@ -1,0 +1,21 @@
+version: '3.8'
+
+networks:
+  events-network:
+    external: true
+    name: events_aigents-events-network
+
+services:
+  validator:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - events-network
+    environment:
+      - RABBITMQ_HOST=events-rabbitmq-1
+      - RABBITMQ_PORT=5672
+      - POLYGON_RPC_URL=https://polygon-mumbai.infura.io/v3/your-project-id
+      - POLYGON_PRIVATE_KEY=your-private-key
+      - VALIDATOR_PRIVATE_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      # добавьте другие необходимые переменные окружения
