@@ -1,0 +1,81 @@
+{
+  "title": "Team Building Activities",
+  "summary": "A collection of engaging team building activities to improve collaboration and communication within teams.",
+  "problem": "How to build team spirit and improve collaboration through fun and engaging activities.",
+  "solution": "A set of team building exercises and games that can be conducted in various settings. Activities are designed to be fun while promoting teamwork, communication, and trust between team members.",
+  
+  "domain": "team_management",
+  "sub_domains": [
+    "collaboration",
+    "communication",
+    "team_development"
+  ],
+  
+  "implementation_steps": [
+    {
+      "order": 1,
+      "title": "Activity Selection",
+      "description": "Choose appropriate activities based on team size and venue."
+    },
+    {
+      "order": 2,
+      "title": "Preparation",
+      "description": "Gather necessary materials and prepare the space."
+    },
+    {
+      "order": 3,
+      "title": "Execution",
+      "description": "Run the activities with clear instructions and timing."
+    },
+    {
+      "order": 4,
+      "title": "Feedback",
+      "description": "Gather feedback from participants after activities."
+    }
+  ],
+  
+  "implementation_requirements": [
+    "Open space",
+    "Basic materials",
+    "Facilitator",
+    "1-2 hours per session"
+  ],
+  
+  "benefits": [
+    "Improved team communication",
+    "Better collaboration",
+    "Increased team morale",
+    "Fun work environment"
+  ],
+  
+  "limitations": [
+    "Results vary by team",
+    "May not suit all personalities",
+    "Requires willing participation",
+    "Time away from work"
+  ],
+  
+  "estimated_resources": [
+    "Activity materials",
+    "Venue rental",
+    "Facilitator time",
+    "Refreshments"
+  ],
+  
+  "estimated_time_cost_minutes": 120,
+  "estimated_financial_cost_value": 500,
+  "estimated_financial_cost_currency": "USD",
+  
+  "tags": [
+    "team_building",
+    "collaboration",
+    "communication",
+    "workplace_activities"
+  ],
+  
+  "language": "en",
+  "creator": "hr_team",
+  "version": "1.0",
+  "creation_date": "2024-03-30T00:00:00Z",
+  "last_updated": "2024-03-30T00:00:00Z"
+} 

@@ -1,0 +1,12 @@
+services:
+  validator-test:
+    build: .
+    command: bash -c "python -m spacy download en_core_web_md && python -m scripts.test_analyzers"
+    volumes:
+      - .:/app
+      - ./results:/app/results
+
+networks:
+  default:
+    name: aigents-network
+    external: true 

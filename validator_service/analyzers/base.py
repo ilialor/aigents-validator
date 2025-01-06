@@ -1,30 +1,22 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 import spacy
-from validator_service.quality_wheel import QualityWheel
 
-class BaseAnalyzer(ABC):
+class BaseAnalyzer:
     """Базовый класс для всех анализаторов критериев"""
     
     def __init__(self, config: Dict = None):
         self.config = config or {}
-        self.quality_wheel = QualityWheel()
         if hasattr(self, 'nlp'):
             self.nlp = spacy.load("en_core_web_md")
     
-    @abstractmethod
-    def analyze(self, practice_data: Dict[str, Any]) -> Dict[str, float]:
-        """
-        Анализирует практику и возвращает оценку с объяснениями
+    async def analyze(self, practice_data: Dict[str, Any]) -> Dict[str, float]:
+        """Асинхронный анализ практики"""
+        return self.analyze_sync(practice_data)
         
-        Returns:
-            Dict с оценкой и объяснением, например:
-            {
-                "score": 8.5,
-                "explanation": "Подробное объяснение оценки..."
-            }
-        """
-        pass
+    def analyze_sync(self, practice_data: Dict[str, Any]) -> Dict[str, float]:
+        """Синхронный анализ практики"""
+        raise NotImplementedError
     
     def _normalize_score(self, score: float, max_score: float = 10.0) -> float:
         """Нормализует оценку к шкале 0-10"""
@@ -37,7 +29,3 @@ class BaseAnalyzer(ABC):
         if not text:
             return False
         return len(str(text).strip()) >= min_length 
-    
-    def validate_scores(self, scores: Dict[str, float]) -> Dict[str, Any]:
-        """Валидация оценок с использованием штурвала качества"""
-        return self.quality_wheel.evaluate_practice(scores) 

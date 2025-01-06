@@ -1,0 +1,61 @@
+{
+  "title": "Quick Team Motivation Tips",
+  "summary": "Simple tips for motivating team members quickly.",
+  "problem": "Team needs motivation",
+  "solution": "Use these quick tips to boost team motivation: give compliments, organize fun activities, provide snacks.",
+  
+  "domain": "management",
+  "sub_domains": [
+    "team_motivation"
+  ],
+  
+  "implementation_steps": [
+    {
+      "order": 1,
+      "title": "Give Compliments",
+      "description": "Say nice things to team members"
+    },
+    {
+      "order": 2,
+      "title": "Fun Activities",
+      "description": "Do something fun together"
+    }
+  ],
+  
+  "implementation_requirements": [
+    "None special",
+    "Some time"
+  ],
+  
+  "benefits": [
+    "Better mood",
+    "More fun",
+    "Happy team"
+  ],
+  
+  "limitations": [
+    "May not work always",
+    "Some people don't like fun"
+  ],
+  
+  "estimated_resources": [
+    "Time",
+    "Snacks"
+  ],
+  
+  "estimated_time_cost_minutes": 30,
+  "estimated_financial_cost_value": 50,
+  "estimated_financial_cost_currency": "USD",
+  
+  "tags": [
+    "motivation",
+    "team",
+    "quick_tips"
+  ],
+  
+  "language": "en",
+  "creator": "random_user",
+  "version": "1.0",
+  "creation_date": "2024-03-30T00:00:00Z",
+  "last_updated": "2024-03-30T00:00:00Z"
+} 

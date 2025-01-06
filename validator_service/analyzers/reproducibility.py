@@ -10,7 +10,7 @@ class ReproducibilityAnalyzer(BaseAnalyzer):
         super().__init__(config)
         self.nlp = spacy.load("en_core_web_md")
         
-    def analyze(self, practice_data: Dict[str, Any]) -> Dict[str, float]:
+    def analyze_sync(self, practice_data: Dict[str, Any]) -> Dict[str, float]:
         scores = {
             "steps_clarity": self._analyze_steps_clarity(practice_data),
             "requirements": self._analyze_requirements(practice_data),
@@ -24,9 +24,8 @@ class ReproducibilityAnalyzer(BaseAnalyzer):
         }
         
         final_score = sum(scores[k] * weights[k] for k in scores)
-        
         return {
-            "score": round(final_score, 2),
+            "score": round(min(final_score, 10.0), 2),
             "details": scores,
             "explanation": self._generate_explanation(scores)
         }

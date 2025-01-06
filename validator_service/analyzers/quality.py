@@ -12,7 +12,7 @@ class QualityAnalyzer(BaseAnalyzer):
         # Загружаем модель spaCy для анализа структуры текста
         self.nlp = spacy.load("en_core_web_md")
         
-    def analyze(self, practice_data: Dict[str, Any]) -> Dict[str, float]:
+    def analyze_sync(self, practice_data: Dict[str, Any]) -> Dict[str, float]:
         scores = {
             "fullness": self._analyze_fullness(practice_data),
             "structure": self._analyze_structure(practice_data),
@@ -20,19 +20,21 @@ class QualityAnalyzer(BaseAnalyzer):
             "limitations": self._analyze_limitations(practice_data)
         }
         
-        # Вычисляем итоговую оценку с весами
+        # Добавляем научный бонус
+        scientific_bonus = self._calculate_scientific_bonus(practice_data)
+        
         weights = {
-            "fullness": 0.4,
-            "structure": 0.3,
+            "fullness": 0.35,
+            "structure": 0.35,
             "examples": 0.15,
             "limitations": 0.15
         }
         
-        final_score = sum(scores[k] * weights[k] for k in scores)
-        
+        final_score = sum(scores[k] * weights[k] for k in scores) + scientific_bonus
         return {
-            "score": round(final_score, 2),
+            "score": round(min(final_score, 10.0), 2),
             "details": scores,
+            "scientific_bonus": scientific_bonus,
             "explanation": self._generate_explanation(scores)
         }
     
@@ -56,31 +58,55 @@ class QualityAnalyzer(BaseAnalyzer):
                 # Учитываем сложность предложений
                 score += min(blob.sentiment.subjectivity * 2, 1.0)
                 
+        # Научные индикаторы в описании
+        scientific_indicators = [
+            "methodology", "statistical", "empirical",
+            "hypothesis", "analysis", "validation",
+            "experiment", "research", "study"
+        ]
+        
+        text = f"{data.get('solution', '')} {data.get('summary', '')}"
+        scientific_score = sum(2.0 for ind in scientific_indicators if ind in text.lower())
+        score += min(scientific_score, 5.0)
+        
         return self._normalize_score(score, 10.0)
     
     def _analyze_structure(self, data: Dict[str, Any]) -> float:
         """Анализ структурированности"""
         score = 0.0
         
-        if "implementation_steps" in data:
+        # Проверяем наличие всех ключевых секций
+        required_sections = ["problem", "solution", "implementation_steps", 
+                            "benefits", "limitations"]
+        for section in required_sections:
+            if data.get(section):
+                score += 1.0
+        
+        # Анализируем детальность шагов реализации
+        if isinstance(data.get("implementation_steps"), list):
             steps = data["implementation_steps"]
-            if isinstance(steps, list):
-                # Проверяем логическую последовательность шагов
-                score += min(len(steps) * 2, 6)
+            if len(steps) >= 5:  # Бонус за подробное описание
+                score += 2.0
+            elif len(steps) >= 3:
+                score += 1.0
                 
-                # Анализируем связность шагов
-                if len(steps) > 1:
-                    prev_doc = None
-                    for step in steps:
-                        if isinstance(step, dict) and "description" in step:
-                            doc = self.nlp(step["description"])
-                            if prev_doc:
-                                # Проверяем связность с предыдущим шагом
-                                similarity = doc.similarity(prev_doc)
-                                score += similarity
-                            prev_doc = doc
-                
-        return self._normalize_score(score, 10.0)
+            # Проверяем качество описания шагов
+            detailed_steps = sum(1 for step in steps 
+                               if len(str(step.get("description", ""))) > 100)
+            score += min(detailed_steps * 0.5, 2.0)
+        
+        # Проверяем научную структуру
+        scientific_elements = [
+            "hypothesis", "methodology", "data collection",
+            "analysis", "validation", "results"
+        ]
+        text = f"{data.get('solution', '')} {' '.join(str(step.get('description', '')) for step in data.get('implementation_steps', []))}"
+        text = text.lower()
+        
+        scientific_score = sum(1 for element in scientific_elements if element in text)
+        score += min(scientific_score * 0.5, 3.0)
+        
+        return self._normalize_score(score)
     
     def _analyze_examples(self, data: Dict[str, Any]) -> float:
         score = 0.0
@@ -138,3 +164,32 @@ class QualityAnalyzer(BaseAnalyzer):
             explanations.append("Структура требует улучшения")
             
         return ". ".join(explanations) 
+    
+    def _calculate_scientific_bonus(self, data: Dict[str, Any]) -> float:
+        """Бонус за научный подход"""
+        score = 0.0
+        text = f"{data.get('solution', '')} {' '.join(str(step.get('description', '')) for step in data.get('implementation_steps', []))}"
+        text = text.lower()
+        
+        scientific_indicators = [
+            (r'doi:\s*10\.\d+/[\w\.-]+', 3.0),         # DOI
+            (r'p\s*[<>=]\s*0\.\d+', 2.0),              # p-value
+            (r'\d+%\s*confidence', 2.0),                # confidence interval
+            ("statistical significance", 2.0),
+            ("hypothesis testing", 2.0),
+            ("empirical validation", 2.0),
+            ("peer-reviewed", 2.0),
+            ("reproducible results", 1.5),
+            ("systematic approach", 1.5),
+            ("quantitative analysis", 1.5)
+        ]
+        
+        for pattern, points in scientific_indicators:
+            if isinstance(pattern, str):
+                if pattern in text:
+                    score += points
+            else:
+                if re.search(pattern, text):
+                    score += points
+                
+        return min(score, 3.0)  # Максимальный бонус 3.0 
