@@ -18,8 +18,8 @@ class QualityWheel:
     """Штурвал качества для управления критериями оценки практик"""
     
     def __init__(self):
-        # Настройки критериев по умолчанию
-        self.thresholds = {
+        # Настройки критериев по умолчанию для реализаций
+        self.implementation_thresholds = {
             "Q": {  # Quality
                 "fullness": CriterionThreshold(6.0, 0.4, True),
                 "structure": CriterionThreshold(6.0, 0.3, True),
@@ -54,6 +54,42 @@ class QualityWheel:
             }
         }
         
+        # Настройки критериев для концептов
+        self.concept_thresholds = {
+            "Q": {  # Quality
+                "theoretical_foundation": CriterionThreshold(6.0, 0.4, True),
+                "clarity": CriterionThreshold(6.0, 0.3, True),
+                "completeness": CriterionThreshold(6.0, 0.3, True)
+            },
+            "R": {  # Reproducibility - для концептов менее строгие требования
+                "understandability": CriterionThreshold(6.0, 0.4, True),
+                "consistency": CriterionThreshold(6.0, 0.3, True),
+                "examples": CriterionThreshold(6.0, 0.3, False)
+            },
+            "U": {  # Utility
+                "problem_relevance": CriterionThreshold(6.0, 0.4, True),
+                "potential_impact": CriterionThreshold(6.0, 0.3, True),
+                "applicability": CriterionThreshold(6.0, 0.3, False)
+            },
+            "A": {  # Applicability
+                "generalization": CriterionThreshold(6.0, 0.4, True),
+                "adaptability": CriterionThreshold(6.0, 0.3, True),
+                "limitations": CriterionThreshold(6.0, 0.3, True)
+            },
+            "I": {  # Innovation - для концептов более важно
+                "novelty": CriterionThreshold(7.0, 0.4, True),
+                "originality": CriterionThreshold(6.0, 0.3, True),
+                "potential": CriterionThreshold(6.0, 0.3, True)
+            },
+            "Rel": {  # Reliability
+                "theoretical_validation": CriterionThreshold(6.0, 0.4, True),
+                "consistency": CriterionThreshold(6.0, 0.3, True),
+                "references": CriterionThreshold(6.0, 0.3, False)
+            }
+        }
+        
+        self.thresholds = self.implementation_thresholds  # По умолчанию используем реализации
+
     def adjust_threshold(self, criterion: str, metric: str, 
                         min_value: Optional[float] = None,
                         weight: Optional[float] = None,
@@ -70,6 +106,10 @@ class QualityWheel:
 
     def evaluate_practice(self, scores: Dict[str, Dict]) -> Dict[str, Any]:
         """Оценка практики с учетом настроенных порогов"""
+        # Определяем категорию практики
+        is_concept = scores.get("category", "implementation") == "concept"
+        self.thresholds = self.concept_thresholds if is_concept else self.implementation_thresholds
+        
         result = {
             "valid_scores": {},
             "invalid_scores": {},

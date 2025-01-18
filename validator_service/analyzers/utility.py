@@ -14,16 +14,27 @@ class UtilityAnalyzer(BaseAnalyzer):
         self.classifier = PracticeClassifier()
         
     def analyze_sync(self, practice_data: Dict[str, Any]) -> Dict[str, float]:
-        practice_type = self.classifier.classify(practice_data)
+        practice_type, is_concept = self.classifier.classify(practice_data)
         
-        if practice_type == PracticeType.SCIENTIFIC:
-            return self._analyze_scientific_utility(practice_data)
-        elif practice_type == PracticeType.ENGINEERING:
-            return self._analyze_engineering_utility(practice_data)
-        elif practice_type == PracticeType.PROCESS:
-            return self._analyze_process_utility(practice_data)
+        # Для концептов и реализаций используем разные веса и критерии
+        if is_concept:
+            if practice_type == PracticeType.SCIENTIFIC:
+                return self._analyze_scientific_concept(practice_data)
+            elif practice_type == PracticeType.ENGINEERING:
+                return self._analyze_engineering_concept(practice_data)
+            elif practice_type == PracticeType.PROCESS:
+                return self._analyze_process_concept(practice_data)
+            else:
+                return self._analyze_management_concept(practice_data)
         else:
-            return self._analyze_management_utility(practice_data)
+            if practice_type == PracticeType.SCIENTIFIC:
+                return self._analyze_scientific_utility(practice_data)
+            elif practice_type == PracticeType.ENGINEERING:
+                return self._analyze_engineering_utility(practice_data)
+            elif practice_type == PracticeType.PROCESS:
+                return self._analyze_process_utility(practice_data)
+            else:
+                return self._analyze_management_utility(practice_data)
             
     def _analyze_scientific_utility(self, data: Dict[str, Any]) -> Dict[str, float]:
         scores = {
@@ -381,4 +392,126 @@ class UtilityAnalyzer(BaseAnalyzer):
             if term in text:
                 score += points
             
+        return self._normalize_score(score) 
+    
+    def _analyze_scientific_concept(self, data: Dict[str, Any]) -> Dict[str, float]:
+        """Анализ научного концепта"""
+        scores = {
+            "theoretical_foundation": self._analyze_fundamental_value(data),
+            "research_potential": self._analyze_research_value(data),
+            "innovation_level": self._analyze_innovation_level(data)
+        }
+        weights = {
+            "theoretical_foundation": 0.4,
+            "research_potential": 0.4,
+            "innovation_level": 0.2
+        }
+        return self._calculate_final_score(scores, weights, data)
+    
+    def _analyze_engineering_concept(self, data: Dict[str, Any]) -> Dict[str, float]:
+        """Анализ инженерного концепта"""
+        scores = {
+            "technical_foundation": self._analyze_technical_value(data),
+            "scalability_potential": self._analyze_scalability(data),
+            "innovation_level": self._analyze_innovation_level(data)
+        }
+        weights = {
+            "technical_foundation": 0.4,
+            "scalability_potential": 0.4,
+            "innovation_level": 0.2
+        }
+        return self._calculate_final_score(scores, weights, data)
+    
+    def _analyze_process_concept(self, data: Dict[str, Any]) -> Dict[str, float]:
+        """Анализ концепта процесса"""
+        scores = {
+            "process_foundation": self._analyze_process_value(data),
+            "adaptability": self._analyze_adaptability(data),
+            "innovation_level": self._analyze_innovation_level(data)
+        }
+        weights = {
+            "process_foundation": 0.4,
+            "adaptability": 0.4,
+            "innovation_level": 0.2
+        }
+        return self._calculate_final_score(scores, weights, data)
+    
+    def _analyze_management_concept(self, data: Dict[str, Any]) -> Dict[str, float]:
+        """Анализ управленческого концепта"""
+        scores = {
+            "management_foundation": self._analyze_management_value(data),
+            "organizational_fit": self._analyze_organizational_fit(data),
+            "innovation_level": self._analyze_innovation_level(data)
+        }
+        weights = {
+            "management_foundation": 0.4,
+            "organizational_fit": 0.4,
+            "innovation_level": 0.2
+        }
+        return self._calculate_final_score(scores, weights, data)
+    
+    def _analyze_innovation_level(self, data: Dict[str, Any]) -> float:
+        """Анализ уровня инновационности"""
+        score = 0.0
+        text = f"{data.get('solution', '')} {data.get('summary', '')}"
+        text = text.lower()
+        
+        innovation_indicators = [
+            ("novel", 3.0),
+            ("innovative", 3.0),
+            ("unique", 2.5),
+            ("breakthrough", 2.5),
+            ("original", 2.0),
+            ("new approach", 2.0),
+            ("improvement", 1.5)
+        ]
+        
+        for term, points in innovation_indicators:
+            if term in text:
+                score += points
+                
+        return self._normalize_score(score)
+    
+    def _analyze_adaptability(self, data: Dict[str, Any]) -> float:
+        """Анализ адаптивности"""
+        score = 0.0
+        text = f"{data.get('solution', '')} {data.get('summary', '')}"
+        text = text.lower()
+        
+        adaptability_indicators = [
+            ("flexible", 3.0),
+            ("adaptable", 3.0),
+            ("customizable", 2.5),
+            ("configurable", 2.5),
+            ("modular", 2.0),
+            ("extensible", 2.0),
+            ("scalable", 1.5)
+        ]
+        
+        for term, points in adaptability_indicators:
+            if term in text:
+                score += points
+                
+        return self._normalize_score(score)
+    
+    def _analyze_organizational_fit(self, data: Dict[str, Any]) -> float:
+        """Анализ организационного соответствия"""
+        score = 0.0
+        text = f"{data.get('solution', '')} {data.get('summary', '')}"
+        text = text.lower()
+        
+        fit_indicators = [
+            ("organizational culture", 3.0),
+            ("team dynamics", 3.0),
+            ("company values", 2.5),
+            ("business goals", 2.5),
+            ("strategic", 2.0),
+            ("alignment", 2.0),
+            ("integration", 1.5)
+        ]
+        
+        for term, points in fit_indicators:
+            if term in text:
+                score += points
+                
         return self._normalize_score(score) 
