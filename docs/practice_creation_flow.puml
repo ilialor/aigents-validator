@@ -1,0 +1,96 @@
+@startuml Practice Creation Flow
+
+skinparam ParticipantPadding 20
+skinparam BoxPadding 10
+
+box "External Services" #LightBlue
+participant "Claude-3\nSonnet" as Claude
+participant "GPT-4" as GPT4
+end box
+
+box "Aigents Services" #LightGreen
+participant "Creator API" as Creator
+participant "Storage API" as Storage
+participant "Validator API" as Validator
+participant "Relations API" as Relations
+participant "Blockchain" as BC
+end box
+
+actor User
+
+== Инициализация создания практики ==
+
+User -> Creator: POST /practice/create\n{title, description, domain, tags}
+activate Creator
+
+Creator -> Claude: Запрос на генерацию практики\n(RAG-enhanced prompt)
+note right: Используется контекст\nсуществующих практик\nи базы знаний
+
+Claude --> Creator: JSON с деталями практики
+note right: Включает:\n- Проблему\n- Решение\n- Шаги реализации\n- Требования\n- Ограничения и др.
+
+Creator -> Storage: POST /practices\n(сохранение практики)
+activate Storage
+
+Storage -> Storage: Генерация embeddings\nдля поиска
+Storage --> Creator: ID практики
+deactivate Storage
+
+Creator --> User: ID созданной практики
+deactivate Creator
+
+== Валидация практики ==
+
+Storage -> Validator: Событие practice.created\n{practice_id}
+activate Validator
+
+Validator -> Storage: GET /practices/{id}\n(получение деталей)
+Storage --> Validator: Детали практики
+
+Validator -> GPT4: Запрос на анализ практики\n(A.I.Q.R.U. критерии)
+note right: Оценка по критериям:\n- Adaptability\n- Innovation\n- Quality\n- Reliability\n- Usage
+
+GPT4 --> Validator: Оценки и рекомендации
+
+Validator -> BC: Сохранение результатов\nвалидации
+activate BC
+BC --> Validator: TX Hash
+deactivate BC
+
+Validator -> Storage: PATCH /practices/{id}\n(обновление статуса)
+Storage --> Validator: OK
+
+Validator -> Storage: POST /practice-validations\n(сохранение оценок)
+Storage --> Validator: OK
+deactivate Validator
+
+== Создание связей ==
+
+Storage -> Relations: Событие practice.validated\n{practice_id, validation_results}
+activate Relations
+
+Relations -> Storage: GET /practices/{id}\n(получение деталей практики)
+Storage --> Relations: Детали практики
+
+Relations -> Storage: GET /practices/search\n(поиск похожих практик)
+note right: Hybrid Search:\n- BM25\n- Векторный поиск\n- Семантический анализ
+Storage --> Relations: Список похожих практик
+
+Relations -> GPT4: Анализ связей между практиками
+note right: Определение типов связей:\n- Улучшает\n- Заменяет\n- Дополняет\n- Конкурирует\n- Зависит от
+
+GPT4 --> Relations: Рекомендованные связи\nс обоснованием
+
+Relations -> Storage: POST /practice-relations\n(создание связей)
+Storage --> Relations: OK
+
+Relations -> BC: Сохранение связей\nв блокчейн
+activate BC
+BC --> Relations: TX Hash
+deactivate BC
+
+Relations -> Storage: PATCH /practices/{id}\n(обновление статуса: complete)
+Storage --> Relations: OK
+deactivate Relations
+
+@enduml 
