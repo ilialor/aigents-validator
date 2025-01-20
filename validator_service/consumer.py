@@ -79,15 +79,18 @@ class MessageConsumer:
                     sota_score=analysis_result["sota_score"],
                     reliability_score=analysis_result.get("reliability_score", 0.0)
                 ))
+                
+                if tx_result and tx_result["status"] == 1:
+                    # Отправляем событие о валидации
+                    self.send_validation_event(practice_id, analysis_result)
+                    logger.info(f"Successfully validated practice {practice_id}")
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
+                else:
+                    logger.error(f"Failed to send validation to blockchain for practice {practice_id}")
+                    ch.basic_reject(delivery_tag=method.delivery_tag)
+                    
             finally:
                 loop.close()
-            
-            if tx_result and tx_result["status"] == 1:
-                logger.info(f"Successfully validated practice {practice_id}")
-                ch.basic_ack(delivery_tag=method.delivery_tag)
-            else:
-                logger.error(f"Failed to send validation to blockchain for practice {practice_id}")
-                ch.basic_reject(delivery_tag=method.delivery_tag)
                 
         except Exception as e:
             logger.error(f"Error processing message: {str(e)}")
@@ -149,14 +152,21 @@ class MessageConsumer:
             )
             logger.info("Объявили exchange: practice.exchange")
             
-            # Объявляем очередь
+            # Объявляем очередь для входящих сообщений
             result = self.channel.queue_declare(
                 queue='practice.events', 
                 durable=True
             )
             logger.info(f"Объявили очередь: practice.events, {result.method.message_count} сообщений в очереди")
             
-            # Создаем привязку
+            # Объявляем очередь для событий валидации
+            result = self.channel.queue_declare(
+                queue='practice.validated',
+                durable=True
+            )
+            logger.info(f"Объявили очередь: practice.validated, {result.method.message_count} сообщений в очереди")
+            
+            # Создаем привязки для входящих сообщений
             self.channel.queue_bind(
                 exchange='practice.exchange',
                 queue='practice.events',
@@ -164,7 +174,6 @@ class MessageConsumer:
             )
             logger.info("Создали привязку: practice.events -> practice.exchange (practice.created)")
             
-            # Дополнительная привязка для всех событий практик
             self.channel.queue_bind(
                 exchange='practice.exchange',
                 queue='practice.events',
@@ -172,8 +181,41 @@ class MessageConsumer:
             )
             logger.info("Создали привязку: practice.events -> practice.exchange (practice.*)")
             
+            # Создаем привязку для событий валидации
+            self.channel.queue_bind(
+                exchange='practice.exchange',
+                queue='practice.validated',
+                routing_key='practice.validated'
+            )
+            logger.info("Создали привязку: practice.validated -> practice.exchange (practice.validated)")
+            
         except Exception as e:
             logger.error(f"Ошибка при подключении к RabbitMQ: {e}", exc_info=True)
+            raise
+
+    def send_validation_event(self, practice_id: str, analysis_result: Dict[str, Any]):
+        """Отправка события о завершении валидации"""
+        try:
+            message = {
+                "practice_id": practice_id,
+                "scores": analysis_result["scores"],
+                "sota_score": analysis_result["sota_score"],
+                "reliability_score": analysis_result.get("reliability_score", 0.0)
+            }
+            
+            self.channel.basic_publish(
+                exchange='practice.exchange',
+                routing_key='practice.validated',
+                body=json.dumps(message).encode(),
+                properties=pika.BasicProperties(
+                    delivery_mode=2,  # делаем сообщение persistent
+                    content_type='application/json'
+                )
+            )
+            logger.info(f"Sent validation event for practice {practice_id}")
+            
+        except Exception as e:
+            logger.error(f"Error sending validation event: {str(e)}")
             raise
 
     def start(self):
