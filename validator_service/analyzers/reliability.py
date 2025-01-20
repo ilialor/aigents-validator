@@ -34,12 +34,12 @@ class ReliabilityAnalyzer(BaseAnalyzer):
         final_score = sum(scores[k] * weights[k] for k in scores)
         
         # Увеличиваем множители для научных практик
-        practice_type = self.classifier.classify(practice_data)
+        practice_type, is_concept = self.classifier.classify(practice_data)
         type_multipliers = {
-            "scientific": 1.5,      # Было 1.3
-            "engineering": 1.3,     # Было 1.2
-            "process": 1.1,
-            "management": 1.0
+            PracticeType.SCIENTIFIC.value: 1.5,      # Было 1.3
+            PracticeType.ENGINEERING.value: 1.3,     # Было 1.2
+            PracticeType.PROCESS.value: 1.1,
+            PracticeType.MANAGEMENT.value: 1.0
         }
         
         final_score *= type_multipliers[practice_type.value]
@@ -69,7 +69,11 @@ class ReliabilityAnalyzer(BaseAnalyzer):
         
         return {
             "score": round(min(final_score, 10.0), 2),
-            "details": scores
+            "details": {
+                **scores,
+                "type_multiplier": type_multipliers[practice_type.value],
+                "is_concept": is_concept
+            }
         }
     
     def _analyze_empirical_validation(self, data: Dict[str, Any]) -> float:

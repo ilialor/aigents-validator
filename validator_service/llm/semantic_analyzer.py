@@ -66,7 +66,20 @@ class SemanticAnalyzer:
             end = response.find("}") + 1
             if start >= 0 and end > start:
                 scores_json = response[start:end]
-                return json.loads(scores_json)
+                scores = json.loads(scores_json)
+                if not scores:
+                    raise ValueError("Empty scores dictionary")
+                return scores
+            raise ValueError("No JSON found in response")
         except Exception as e:
             print(f"Error extracting scores: {e}")
-            return {} 
+            print(f"Response: {response}")
+            # Возвращаем дефолтные значения вместо пустого словаря
+            return {
+                "fundamental_value": 5.0,
+                "practical_value": 5.0,
+                "measurable_value": 5.0,
+                "universality": 5.0,
+                "adaptability": 5.0,
+                "accessibility": 5.0
+            } 

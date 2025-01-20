@@ -66,6 +66,19 @@ class UtilityAnalyzer(BaseAnalyzer):
         final_scores = self._combine_scores(llm_scores, basic_scores)
         return final_scores
     
+    def _prepare_text(self, practice_data: Dict[str, Any]) -> str:
+        """Подготавливает текст практики для анализа"""
+        text_parts = [
+            practice_data.get('title', ''),
+            practice_data.get('summary', ''),
+            practice_data.get('problem', ''),
+            practice_data.get('solution', ''),
+            ' '.join(str(step.get('description', '')) for step in practice_data.get('implementation_steps', [])),
+            ' '.join(practice_data.get('benefits', [])),
+            ' '.join(practice_data.get('limitations', []))
+        ]
+        return ' '.join(filter(None, text_parts))
+    
     def _analyze_fundamental_value(self, data: Dict[str, Any]) -> float:
         """Оценка фундаментальной ценности"""
         score = 0.0
@@ -511,6 +524,95 @@ class UtilityAnalyzer(BaseAnalyzer):
         ]
         
         for term, points in fit_indicators:
+            if term in text:
+                score += points
+                
+        return self._normalize_score(score)
+    
+    def _analyze_basic_metrics(self, practice_data: Dict[str, Any]) -> Dict[str, float]:
+        """Анализ базовых метрик полезности"""
+        return {
+            "practical_value": self._analyze_practical_value(practice_data),
+            "measurable_value": self._analyze_measurable_value(practice_data),
+            "fundamental_value": self._analyze_fundamental_value(practice_data)
+        }
+
+    def _combine_scores(self, llm_scores: Dict[str, float], basic_scores: Dict[str, float]) -> Dict[str, float]:
+        """Комбинирует оценки от LLM и базовые метрики"""
+        combined_scores = {**llm_scores, **basic_scores}
+        weights = {
+            "practical_value": 0.3,
+            "measurable_value": 0.3,
+            "fundamental_value": 0.2,
+            "llm_score": 0.2
+        }
+        final_score = sum(combined_scores.get(k, 0) * v for k, v in weights.items())
+        return {
+            "score": round(min(final_score, 10.0), 2),
+            "details": combined_scores
+        }
+
+    def _analyze_technical_value(self, data: Dict[str, Any]) -> float:
+        """Оценка технической ценности"""
+        score = 0.0
+        text = f"{data.get('solution', '')} {data.get('summary', '')}"
+        text = text.lower()
+        
+        technical_indicators = [
+            ("performance", 3.0),
+            ("efficiency", 3.0),
+            ("scalability", 2.5),
+            ("reliability", 2.5),
+            ("maintainability", 2.0),
+            ("security", 2.0),
+            ("optimization", 1.5)
+        ]
+        
+        for term, points in technical_indicators:
+            if term in text:
+                score += points
+                
+        return self._normalize_score(score)
+
+    def _analyze_process_value(self, data: Dict[str, Any]) -> float:
+        """Оценка ценности процесса"""
+        score = 0.0
+        text = f"{data.get('solution', '')} {data.get('summary', '')}"
+        text = text.lower()
+        
+        process_indicators = [
+            ("workflow", 3.0),
+            ("automation", 3.0),
+            ("efficiency", 2.5),
+            ("standardization", 2.5),
+            ("integration", 2.0),
+            ("optimization", 2.0),
+            ("streamline", 1.5)
+        ]
+        
+        for term, points in process_indicators:
+            if term in text:
+                score += points
+                
+        return self._normalize_score(score)
+
+    def _analyze_management_value(self, data: Dict[str, Any]) -> float:
+        """Оценка управленческой ценности"""
+        score = 0.0
+        text = f"{data.get('solution', '')} {data.get('summary', '')}"
+        text = text.lower()
+        
+        management_indicators = [
+            ("leadership", 3.0),
+            ("strategy", 3.0),
+            ("organization", 2.5),
+            ("coordination", 2.5),
+            ("planning", 2.0),
+            ("control", 2.0),
+            ("motivation", 1.5)
+        ]
+        
+        for term, points in management_indicators:
             if term in text:
                 score += points
                 

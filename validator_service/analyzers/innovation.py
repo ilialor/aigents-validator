@@ -14,21 +14,25 @@ class InnovationAnalyzer(BaseAnalyzer):
         self.classifier = PracticeClassifier()
         
     def analyze_sync(self, practice_data: Dict[str, Any]) -> Dict[str, float]:
-        practice_type = self.classifier.classify(practice_data)
+        practice_type, is_concept = self.classifier.classify(practice_data)
         base_score = self._get_base_innovation_score(practice_data)
         
         # Используем .value для доступа к строковому значению enum
         type_multipliers = {
-            "scientific": 1.4,    # Научные практики обычно более инновационны
-            "engineering": 1.3,   # Инженерные практики тоже часто инновационны
-            "process": 1.1,       # Процессные практики могут быть инновационными
-            "management": 1.0     # Управленческие практики реже инновационны
+            PracticeType.SCIENTIFIC.value: 1.4,    # Научные практики обычно более инновационны
+            PracticeType.ENGINEERING.value: 1.3,   # Инженерные практики тоже часто инновационны
+            PracticeType.PROCESS.value: 1.1,       # Процессные практики могут быть инновационными
+            PracticeType.MANAGEMENT.value: 1.0     # Управленческие практики реже инновационны
         }
         
         final_score = base_score * type_multipliers[practice_type.value]
         return {
             "score": round(min(final_score, 10.0), 2),
-            "details": {"base_score": base_score, "multiplier": type_multipliers[practice_type.value]}
+            "details": {
+                "base_score": base_score, 
+                "multiplier": type_multipliers[practice_type.value],
+                "is_concept": is_concept
+            }
         }
     
     def _get_base_innovation_score(self, data: Dict[str, Any]) -> float:

@@ -1,10 +1,16 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TypedDict
+import asyncio
 from .analyzers.quality import QualityAnalyzer
 from .analyzers.reproducibility import ReproducibilityAnalyzer
 from .analyzers.utility import UtilityAnalyzer
 from .analyzers.applicability import ApplicabilityAnalyzer
 from .analyzers.innovation import InnovationAnalyzer
 from .analyzers.reliability import ReliabilityAnalyzer
+
+class AnalysisResult(TypedDict):
+    scores: Dict[str, Dict[str, Any]]
+    sota_score: float
+    reliability_score: Optional[float]
 
 class PracticeAnalyzer:
     """Основной класс для анализа практик"""
@@ -28,7 +34,7 @@ class PracticeAnalyzer:
             "I": 0.15
         }
         
-    def analyze(self, practice_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def analyze(self, practice_data: Dict[str, Any]) -> AnalysisResult:
         """Анализ практики по всем критериям"""
         if not self._validate_practice_data(practice_data):
             raise ValueError("Invalid practice data format")
@@ -37,7 +43,7 @@ class PracticeAnalyzer:
         
         # Анализируем по каждому критерию
         for criterion, analyzer in self.analyzers.items():
-            results[criterion] = analyzer.analyze(practice_data)
+            results[criterion] = await analyzer.analyze(practice_data)
             
         # Вычисляем sota_score
         sota_scores = {k: v["score"] for k, v in results.items() if k != "Rel"}
@@ -54,9 +60,9 @@ class PracticeAnalyzer:
         required_fields = ['title', 'summary', 'problem', 'solution']
         return all(field in data and data[field] for field in required_fields)
 
-def analyze_practice(practice_data: Dict[str, Any], custom_config: Optional[Dict] = None) -> Dict[str, Any]:
+async def analyze_practice(practice_data: Dict[str, Any], custom_config: Optional[Dict] = None) -> AnalysisResult:
     """
     Анализирует практику и возвращает оценки по критериям Q.R.U.A.I. + Reliability
     """
     analyzer = PracticeAnalyzer(custom_config)
-    return analyzer.analyze(practice_data) 
+    return await analyzer.analyze(practice_data) 

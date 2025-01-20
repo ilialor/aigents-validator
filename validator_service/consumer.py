@@ -1,24 +1,128 @@
 import json
 import pika
 import requests
-from typing import Dict
+import asyncio
+from typing import Dict, Any, Optional
 import logging
+from aio_pika import IncomingMessage, connect_robust
+from aio_pika.abc import AbstractRobustConnection
+import backoff
 
 from .config import settings
-from .ai_agent import analyze_practice
+from .ai_agent import analyze_practice, AnalysisResult
 from .blockchain import BlockchainClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class ValidatorConsumer:
-    def __init__(self):
-        self.blockchain_client = BlockchainClient()
-        self.connect_to_rabbitmq()
-
-    def connect_to_rabbitmq(self):
-        """Установка соединения с RabbitMQ"""
+class MessageConsumer:
+    def __init__(self, loop: Optional[asyncio.AbstractEventLoop] = None):
+        self.loop = loop or asyncio.get_event_loop()
+        self.blockchain = BlockchainClient()
+        self.connection = None
+        self.channel = None
+        
+    def _on_message(self, channel, method_frame, header_frame, body):
+        """Обертка для обработки входящего сообщения"""
         try:
+            if self.connection is None or self.connection.is_closed:
+                logger.error("Connection is closed, reconnecting...")
+                self.connect_to_rabbitmq()
+            self.process_message(channel, method_frame, header_frame, body)
+        except Exception as e:
+            logger.error(f"Error in message wrapper: {str(e)}")
+            if not channel.is_closed:
+                channel.basic_reject(delivery_tag=method_frame.delivery_tag)
+        
+    def process_message(self, ch, method, properties, body):
+        """Обработка входящего сообщения"""
+        try:
+            # Декодируем сообщение
+            data = json.loads(body.decode())
+            logger.debug(f"Received message: {data}")
+            
+            # Получаем practice_id из payload
+            practice_id = data.get("payload", {}).get("practice_id")
+            if not practice_id:
+                logger.error("No practice_id in message payload")
+                logger.debug(f"Message structure: {data}")
+                ch.basic_reject(delivery_tag=method.delivery_tag)
+                return
+                
+            logger.info(f"Received new message for practice {practice_id}")
+            
+            # Получаем данные практики из API
+            full_practice_data = self.get_practice_details(practice_id)
+            if not full_practice_data:
+                logger.error(f"Failed to fetch practice data for {practice_id}")
+                ch.basic_reject(delivery_tag=method.delivery_tag)
+                return
+                
+            # Создаем новый event loop для асинхронных операций
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                # Анализируем практику
+                analysis_result = loop.run_until_complete(analyze_practice(full_practice_data))
+                
+                # Проверяем результат
+                if not analysis_result or "sota_score" not in analysis_result:
+                    logger.error(f"Invalid analysis result for practice {practice_id}")
+                    ch.basic_reject(delivery_tag=method.delivery_tag)
+                    return
+                    
+                # Отправляем результат в блокчейн
+                tx_result = loop.run_until_complete(self.blockchain.send_validation_to_contract(
+                    practice_id=practice_id,
+                    scores=analysis_result["scores"],
+                    sota_score=analysis_result["sota_score"],
+                    reliability_score=analysis_result.get("reliability_score", 0.0)
+                ))
+            finally:
+                loop.close()
+            
+            if tx_result and tx_result["status"] == 1:
+                logger.info(f"Successfully validated practice {practice_id}")
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+            else:
+                logger.error(f"Failed to send validation to blockchain for practice {practice_id}")
+                ch.basic_reject(delivery_tag=method.delivery_tag)
+                
+        except Exception as e:
+            logger.error(f"Error processing message: {str(e)}")
+            if not ch.is_closed:
+                ch.basic_reject(delivery_tag=method.delivery_tag)
+
+    @backoff.on_exception(backoff.expo, 
+                         (requests.exceptions.RequestException,),
+                         max_tries=3)
+    def get_practice_details(self, practice_id: str) -> Dict:
+        """Получение деталей практики через FastAPI с автоматическим повтором при ошибке"""
+        try:
+            url = f"{settings.FASTAPI_URL}/api/v1/practices/{practice_id}"
+            logger.info(f"Fetching practice details from: {url}")
+            
+            response = requests.get(url, timeout=10)  # Добавляем timeout
+            response.raise_for_status()
+            
+            logger.info(f"Successfully retrieved practice details for ID: {practice_id}")
+            return response.json()
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching practice details: {e}")
+            raise
+
+    @backoff.on_exception(backoff.expo, 
+                         (pika.exceptions.AMQPConnectionError,
+                          pika.exceptions.AMQPChannelError),
+                         max_tries=5)
+    def connect_to_rabbitmq(self):
+        """Установка соединения с RabbitMQ с автоматическим повтором при ошибке"""
+        try:
+            if self.connection and not self.connection.is_closed:
+                return
+                
             credentials = pika.PlainCredentials(
                 settings.RABBITMQ_USER, 
                 settings.RABBITMQ_PASS
@@ -56,7 +160,7 @@ class ValidatorConsumer:
             self.channel.queue_bind(
                 exchange='practice.exchange',
                 queue='practice.events',
-                routing_key='practice.created'  # Конкретный routing key для события создания практики
+                routing_key='practice.created'
             )
             logger.info("Создали привязку: practice.events -> practice.exchange (practice.created)")
             
@@ -72,87 +176,42 @@ class ValidatorConsumer:
             logger.error(f"Ошибка при подключении к RabbitMQ: {e}", exc_info=True)
             raise
 
-    def get_practice_details(self, practice_id: str) -> Dict:
-        """Получение деталей практики через FastAPI"""
-        try:
-            url = f"{settings.FASTAPI_URL}/api/v1/practices/{practice_id}"
-            logger.info(f"Fetching practice details from: {url}")
-            
-            response = requests.get(url)
-            response.raise_for_status()
-            
-            logger.info(f"Successfully retrieved practice details for ID: {practice_id}")
-            return response.json()
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching practice details: {e}")
-            raise
-
-    def process_message(self, ch, method, properties, body):
-        """Обработка сообщения из очереди"""
-        try:
-            event_data = json.loads(body)
-            
-            # Проверяем тип события
-            if event_data.get('type') == 'practice.created':
-                practice_id = event_data['payload']['practice_id']
-                
-                logger.info(f"Получено новое сообщение для практики {practice_id}")
-                
-                # Получаем полные данные практики
-                full_practice_data = self.get_practice_details(practice_id)
-                
-                # Анализируем практику через AI-агента
-                rating_criteria = analyze_practice(full_practice_data)
-                
-                # Принимаем решение на основе sota_score
-                final_decision = 'approve' if rating_criteria['sota_score'] > 5 else 'reject'
-                stake_amount = 100  # Фиксированный стейк для MVP
-                
-                # Отправляем результаты в блокчейн
-                tx_receipt = self.blockchain_client.send_validation_to_contract(
-                    practice_id,
-                    rating_criteria,
-                    final_decision,
-                    stake_amount
-                )
-                
-                logger.info(f"Валидация успешно записана в блокчейн. TX: {tx_receipt['transactionHash'].hex()}")
-                
-                # Подтверждаем обработку сообщения
-                ch.basic_ack(delivery_tag=method.delivery_tag)
-                
-        except Exception as e:
-            logger.error(f"Ошибка при обработке сообщения: {e}")
-            # В случае ошибки возвращаем сообщение в очередь
-            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
-
     def start(self):
         """Запуск консьюмера"""
-        try:
-            logger.info("Запуск Validator Service...")
-            
-            # Настраиваем получение сообщений
-            self.channel.basic_qos(prefetch_count=1)
-            self.channel.basic_consume(
-                queue='practice.events',
-                on_message_callback=self.process_message,
-                auto_ack=False
-            )
-            
-            logger.info("Ожидание сообщений из очереди practice.events...")
-            self.channel.start_consuming()
-            
-        except KeyboardInterrupt:
-            logger.info("Получен сигнал остановки, закрываем соединение...")
-            self.connection.close()
-            
-        except Exception as e:
-            logger.error(f"Критическая ошибка: {e}")
-            if self.connection and not self.connection.is_closed:
-                self.connection.close()
-            raise
+        while True:
+            try:
+                if self.connection is None or self.connection.is_closed:
+                    self.connect_to_rabbitmq()
+                
+                logger.info("Запуск Validator Service...")
+                
+                # Настраиваем получение сообщений
+                self.channel.basic_qos(prefetch_count=1)
+                self.channel.basic_consume(
+                    queue='practice.events',
+                    on_message_callback=self._on_message,
+                    auto_ack=False
+                )
+                
+                logger.info("Ожидание сообщений из очереди practice.events...")
+                self.channel.start_consuming()
+                
+            except KeyboardInterrupt:
+                logger.info("Получен сигнал остановки, закрываем соединение...")
+                if self.connection and not self.connection.is_closed:
+                    self.connection.close()
+                break
+                
+            except pika.exceptions.AMQPConnectionError:
+                logger.error("Потеряно соединение с RabbitMQ, пробуем переподключиться...")
+                continue
+                
+            except Exception as e:
+                logger.error(f"Критическая ошибка: {e}")
+                if self.connection and not self.connection.is_closed:
+                    self.connection.close()
+                raise
 
 if __name__ == "__main__":
-    consumer = ValidatorConsumer()
+    consumer = MessageConsumer()
     consumer.start() 

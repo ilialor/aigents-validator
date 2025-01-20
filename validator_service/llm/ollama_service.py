@@ -7,7 +7,7 @@ class OllamaService:
     
     def __init__(self, config: Dict = None):
         self.config = config or {}
-        self.base_url = self.config.get("OLLAMA_API_URL", "http://ollama:11434")
+        self.base_url = self.config.get("OLLAMA_API_URL", "http://aigents-storage-ollama-1:11434")
         self.model = self.config.get("OLLAMA_MODEL", "llama2")
         
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
@@ -23,16 +23,28 @@ class OllamaService:
             )
             return response.json()["embedding"]
             
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=20))
     async def get_completion(self, prompt: str) -> str:
         """Получение completion от модели"""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=180.0) as client:
             response = await client.post(
                 f"{self.base_url}/api/generate",
                 json={
                     "model": self.model,
                     "prompt": prompt,
-                    "stream": False
+                    "stream": False,
+                    "options": {
+                        "num_ctx": 2048,
+                        "num_predict": 256,
+                        "temperature": 0.5,
+                        "top_k": 20,
+                        "top_p": 0.7,
+                        "stop": ["</response>"]
+                    }
                 }
             )
-            return response.json()["response"] 
+            response.raise_for_status()
+            data = response.json()
+            if "response" not in data:
+                raise ValueError(f"Unexpected API response format: {data}")
+            return data["response"] 

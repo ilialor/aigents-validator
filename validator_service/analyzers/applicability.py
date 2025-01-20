@@ -6,12 +6,6 @@ from .base import BaseAnalyzer
 from .practice_classifier import PracticeClassifier, PracticeType
 from enum import Enum
 
-class PracticeType(Enum):
-    SCIENTIFIC = "scientific"      # Научные методы, исследования
-    ENGINEERING = "engineering"    # Инженерные практики, технические решения
-    PROCESS = "process"           # Процессные практики (agile, code review)
-    MANAGEMENT = "management"      # Управленческие практики
-    
 class ApplicabilityAnalyzer(BaseAnalyzer):
     """Анализатор применимости (A)"""
     
@@ -21,15 +15,15 @@ class ApplicabilityAnalyzer(BaseAnalyzer):
         self.classifier = PracticeClassifier()
         
     def analyze_sync(self, practice_data: Dict[str, Any]) -> Dict[str, float]:
-        practice_type = self.classifier.classify(practice_data)
+        practice_type, is_concept = self.classifier.classify(practice_data)
         base_score = self._analyze_generalization(practice_data)
         
         # Увеличиваем множители
         type_multipliers = {
-            "scientific": 1.4,     # Было 1.2
-            "engineering": 1.3,    # Было 1.1
-            "process": 1.1,        # Было 0.9
-            "management": 1.0      # Было 0.8
+            PracticeType.SCIENTIFIC.value: 1.4,     # Было 1.2
+            PracticeType.ENGINEERING.value: 1.3,    # Было 1.1
+            PracticeType.PROCESS.value: 1.1,        # Было 0.9
+            PracticeType.MANAGEMENT.value: 1.0      # Было 0.8
         }
         
         final_score = base_score * type_multipliers[practice_type.value]
@@ -47,7 +41,11 @@ class ApplicabilityAnalyzer(BaseAnalyzer):
             
         return {
             "score": round(min(final_score, 10.0), 2),
-            "details": {"base_score": base_score, "multiplier": type_multipliers[practice_type.value]}
+            "details": {
+                "base_score": base_score, 
+                "multiplier": type_multipliers[practice_type.value],
+                "is_concept": is_concept
+            }
         }
         
     def _analyze_scientific_applicability(self, data: Dict[str, Any]) -> Dict[str, float]:

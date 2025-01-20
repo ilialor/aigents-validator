@@ -1,10 +1,13 @@
 # Базовые зависимости
 pika==1.3.1
+aio-pika==9.3.1
+aiohttp==3.9.3
 requests==2.31.0
 web3==6.11.1
 pydantic==2.5.2
 pydantic-settings==2.1.0
-spacy>=3.0.0
+spacy==3.7.2
+en-core-web-md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.7.1/en_core_web_md-3.7.1-py3-none-any.whl
 textblob>=0.15.3
 scikit-learn>=0.24.0
 numpy>=1.19.0
@@ -13,3 +16,6 @@ tabulate>=0.9.0
 # Новые зависимости для LLM
 httpx==0.24.1
 tenacity==8.2.2
+
+# Зависимости для обработки ошибок и повторных попыток
+backoff==2.2.1
